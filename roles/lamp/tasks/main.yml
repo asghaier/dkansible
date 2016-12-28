@@ -1,0 +1,95 @@
+---
+# This playbook contains common plays that will be run on all nodes.
+
+- name: diable SELinux
+  selinux:
+    policy: targeted
+    state: disabled
+  register: st
+
+- name: restart machine
+  shell: sleep 2 && reboot
+  async: 1
+  ignore_errors: true
+  when: st.changed
+
+- name: waiting for server to come back
+  local_action: wait_for host=192.168.99.100 port=22 search_regex=OpenSSH delay=5 timeout=300
+  connection: local
+  become: false
+  when: st.changed
+
+- name: Install EPEL and REMI repository
+  yum:
+    state: present
+    name: "{{ item }}"
+  with_items:
+    - yum-utils
+    - https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+    - http://rpms.remirepo.net/enterprise/remi-release-7.rpm
+
+- name: Enable Optional RPMs repository
+  shell: subscription-manager repos --enable=rhel-7-server-optional-rpms
+
+- name: Enable Remi PHP 5.6 repository
+  shell: yum-config-manager --enable remi-php56
+
+- name: Yum update
+  yum:
+    name: '*'
+    state: latest
+
+- name: Install PHP56 and Apache
+  yum:
+    state: present
+    name: "{{ item }}"
+  with_items:
+    - php.x86_64
+    - php-bcmath.x86_64
+    - php-dba.x86_64
+    - php-gd.x86_64
+    - php-gmp.x86_64
+    - php-imap.x86_64
+    - php-ldap.x86_64
+    - php-mbstring.x86_64
+    - php-mcrypt.x86_64
+    - php-mssql.x86_64
+    - php-mysqlnd.x86_64
+    - php-mysql.x86_64
+    - php-pdo.x86_64
+    - php-pecl-gnupg.x86_64
+    - php-pecl-http.x86_64
+    - php-pecl-igbinary.x86_64
+    - php-pecl-imagick.x86_64
+    - php-pecl-memcache.x86_64
+    - php-pecl-mongo.x86_64
+    - php-pecl-oauth.x86_64
+    - php-pecl-propro.x86_64
+    - php-pecl-raphf.x86_64
+    - php-pecl-ssh2.x86_64
+    - php-pecl-uploadprogress.x86_64
+    - php-pecl-xhprof.x86_64
+    - php-pgsql.x86_64
+    - php-pspell.x86_64
+    - php-soap.x86_64
+    - php-tidy.x86_64
+    - php-xmlrpc.x86_64
+    - mod_ssl.x86_64
+
+- name: Install MariaDB
+  yum:
+    state: present
+    name: mariadb-server
+
+- name: Install Git
+  yum:
+    state: present
+    name: git
+
+- name: Install latest Drush.phar
+  shell: |
+    drush_latest="$(curl -s https://github.com/drush-ops/drush/releases/latest| grep -c "$(drush --version|grep -i version|cut -f2 -d':'|tr -d ' ')")"
+    if [ ! -e /usr/local/bin/drush ] || [ $drush_latest -ne 1 ]; then
+      php -r "readfile('https://s3.amazonaws.com/files.drush.org/drush.phar');" > /usr/local/bin/drush
+      chmod +x /usr/local/bin/drush
+    fi

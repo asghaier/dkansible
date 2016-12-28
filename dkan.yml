@@ -1,0 +1,9 @@
+---
+
+- name: Setup and configure the LAMP stack
+  hosts: all
+  remote_user: root
+
+  roles:
+    - lamp
+
